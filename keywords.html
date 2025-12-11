@@ -1,1 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Keyword Manager</title>
+</head>
+<body>
+
+<header>
+    <img src="/static/logo.png">
+    <a href="/dashboard">Dashboard</a>
+</header>
+
+<div class="container">
+    <h1>🔑 Keyword Replies</h1>
+
+    <h2>Add / Update Keyword Reply</h2>
+
+    <form method="POST">
+        <label>Keyword</label>
+        <input type="text" name="keyword">
+
+        <label>Reply Text</label>
+        <textarea name="reply" rows="4"></textarea>
+
+        <button type="submit">Save</button>
+    </form>
+
+    <hr>
+
+    <h2>Existing Rules</h2>
+
+    {% for k, v in keywords.items() %}
+        <div class="post-box">
+            <p><strong>{{ k }}</strong></p>
+            <p>{{ v }}</p>
+        </div>
+    {% endfor %}
+
+</div>
+
+</body>
+</html>
 

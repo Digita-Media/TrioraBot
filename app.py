@@ -94,5 +94,17 @@ def home():
     return "Triora Group Bot is running."
 
 if __name__ == "__main__":
-    # Start polling loop
-    start_polling()
+    from waitress import serve
+    import threading
+
+    # Start polling loop in background thread
+    polling_thread = threading.Thread(target=start_polling, daemon=True)
+    polling_thread.start()
+
+    print("🔥 Polling started — bot is active.")
+    print("🌐 Starting web server...")
+
+    # Start web server (Render-compatible)
+    serve(app, host="0.0.0.0", port=10000)
+
+

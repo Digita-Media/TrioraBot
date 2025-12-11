@@ -1,195 +1,144 @@
 import os
-from flask import Flask, request, jsonify, session, redirect, render_template, url_for
-from flask_bcrypt import Bcrypt
-from flask_session import Session
+import time
 import requests
-from uuid import uuid4
+from flask import Flask, request
 
-# --------------------------------------
-# CONFIG
-# --------------------------------------
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev_secret_key")
-app.config["SESSION_TYPE"] = "filesystem"
 
-Session(app)
-bcrypt = Bcrypt(app)
+# ------------------------------------------------
+# CONFIG
+# ------------------------------------------------
+VERIFY_TOKEN = "triora_verify_2025"
+PAGE_ACCESS_TOKEN = os.getenv("USER_ACCESS_TOKEN")   # long-lived token you will set in Replit
+GROUP_ID = "849838074302350"  # group ID you provided
 
-# --------------------------------------
-# DATA STORAGE (TEMP - WILL MOVE TO DB LATER)
-# --------------------------------------
+# ------------------------------------------------
+# KEYWORD AUTO-REPLIES
+# ------------------------------------------------
+KEYWORD_REPLIES = {
+    ("mould", "black mould", "black spots"): """Thanks for sharing your post. Mould can appear for a variety of reasons, and understanding the underlying moisture source is important.
 
-users = {
-    "connor@triora.co.uk": {
-        "password": bcrypt.generate_password_hash("Triorabot25").decode(),
-        "role": "admin"
-    }
+If you’d like help identifying possible causes or next steps, our team can assist:
+📞 +44 (0)1782 898444
+✉️ dminfo@triora.co.uk
+🌐 https://trioradampandmould.co.uk""",
+
+    ("condensation", "wet windows", "moisture"): """Thanks for your post. Condensation can happen in different situations and may be linked to a number of contributing factors.
+
+If you'd like some advice on managing moisture or exploring potential causes, we're here to help:
+📞 +44 (0)1782 898444
+✉️ dminfo@triora.co.uk
+🌐 https://trioradampandmould.co.uk""",
+
+    ("leak", "leaking", "water ingress"): """Thanks for sharing. Moisture from leaks or water ingress can come from various sources, so gathering a bit more information is usually helpful.
+
+If you'd like support in working out what might be happening, please feel free to contact us:
+📞 +44 (0)1782 898444
+✉️ dminfo@triora.co.uk
+🌐 https://trioradampandmould.co.uk""",
 }
 
-keywords = {
-    "mould": "Thanks for sharing. Mould can appear for many reasons. If you'd like guidance: https://trioradampandmould.co.uk",
-    "condensation": "Condensation can have many causes. We're here to help.",
-    "damp": "Thanks for sharing. Damp issues often need assessment."
-}
+GENERIC_FALLBACK = """Thanks for your post! Damp and mould issues can have a range of causes, and getting the right advice early can make a big difference.
 
-pending_posts = []  # All detected posts
-ai_suggestions = {}  # Post ID → AI generated reply
+If you’d like some guidance, feel free to contact our team at Triora Damp & Mould:
+📞 +44 (0)1782 898444
+✉️ dminfo@triora.co.uk
+🌐 https://trioradampandmould.co.uk"""
 
-FACEBOOK_PAGE_ID = "TrioraDampandMould"
-GROUP_ID = "2095729247274508"  # Real group
-FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN", "")
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
-# --------------------------------------
-# AUTH HELPERS
-# --------------------------------------
-
-def logged_in():
-    return "user" in session
-
-def admin_only():
-    return logged_in() and session["role"] == "admin"
-
-# --------------------------------------
-# ROUTES
-# --------------------------------------
-
-@app.route("/")
+# ------------------------------------------------
+# WEBHOOK ENDPOINTS
+# ------------------------------------------------
+@app.route("/", methods=["GET"])
 def home():
-    if not logged_in():
-        return redirect("/login")
-    return redirect("/dashboard")
+    return "Triora Bot is running!", 200
 
-# --------------------------------------
-# LOGIN
-# --------------------------------------
+@app.route("/webhook", methods=["GET"])
+def verify_webhook():
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        return challenge, 200
 
-        if email in users:
-            stored_pw = users[email]["password"]
-            if bcrypt.check_password_hash(stored_pw, password):
-                session["user"] = email
-                session["role"] = users[email]["role"]
-                return redirect("/dashboard")
+    return "Verification token mismatch", 403
 
-        return render_template("login.html", error="Invalid credentials")
+@app.route("/webhook", methods=["POST"])
+def receive_webhook():
+    data = request.get_json()
+    print("Webhook Received:", data)
+    return "EVENT_RECEIVED", 200
 
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
-
-# --------------------------------------
-# DASHBOARD
-# --------------------------------------
-
-@app.route("/dashboard")
-def dashboard():
-    if not logged_in():
-        return redirect("/login")
-
-    return render_template("dashboard.html", posts=pending_posts)
-
-# --------------------------------------
-# POST DETAIL
-# --------------------------------------
-
-@app.route("/post/<post_id>")
-def post_detail(post_id):
-    if not logged_in():
-        return redirect("/login")
-
-    post = next((p for p in pending_posts if p["id"] == post_id), None)
-
-    if not post:
-        return "Post not found", 404
-
-    suggestion = ai_suggestions.get(post_id, "")
-
-    return render_template("post_detail.html", post=post, suggestion=suggestion)
-
-# --------------------------------------
-# UPDATE KEYWORDS
-# --------------------------------------
-
-@app.route("/keywords", methods=["GET", "POST"])
-def keyword_page():
-    if not admin_only():
-        return redirect("/dashboard")
-
-    if request.method == "POST":
-        word = request.form["keyword"]
-        reply = request.form["reply"]
-        keywords[word.lower()] = reply
-
-    return render_template("keywords.html", keywords=keywords)
-
-# --------------------------------------
-# ADD STAFF USERS (ADMIN ONLY)
-# --------------------------------------
-
-@app.route("/admin/users", methods=["GET", "POST"])
-def admin_users():
-    if not admin_only():
-        return redirect("/dashboard")
-
-    if request.method == "POST":
-        email = request.form["email"]
-        pw = request.form["password"]
-        role = request.form["role"]
-
-        users[email] = {
-            "password": bcrypt.generate_password_hash(pw).decode(),
-            "role": role
-        }
-
-    return render_template("admin_users.html", users=users)
-
-# --------------------------------------
-# AI CONSOLE (ADMIN ONLY)
-# --------------------------------------
-
-@app.route("/admin/ai", methods=["GET", "POST"])
-def ai_console():
-    if not admin_only():
-        return redirect("/dashboard")
-
-    output = ""
-
-    if request.method == "POST":
-        prompt = request.form["prompt"]
-        output = "AI replies will work once API key is added."
-
-    return render_template("admin_ai_console.html", output=output)
-
-# --------------------------------------
-# FACEBOOK POLLING PLACEHOLDER
-# --------------------------------------
-
-@app.route("/poll_test")
-def poll_test():
-    """Simulated post detection until live Facebook integration"""
-    fake_post = {
-        "id": str(uuid4()),
-        "text": "My house has mould issues, what should I do?",
-        "type": "advice"
+# ------------------------------------------------
+# REPLY FUNCTION
+# ------------------------------------------------
+def send_comment(post_id, message):
+    url = f"https://graph.facebook.com/v17.0/{post_id}/comments"
+    payload = {
+        "message": message,
+        "access_token": PAGE_ACCESS_TOKEN,
     }
-    pending_posts.append(fake_post)
+    r = requests.post(url, data=payload)
+    print("Reply sent:", r.text)
 
-    return "Fake post added!"
+# ------------------------------------------------
+# KEYWORD MATCHING
+# ------------------------------------------------
+def get_reply_for_text(text):
+    text_low = text.lower()
+    for keywords, reply in KEYWORD_REPLIES.items():
+        if any(k in text_low for k in keywords):
+            return reply
+    return GENERIC_FALLBACK
 
-# --------------------------------------
-# START
-# --------------------------------------
+# ------------------------------------------------
+# POLLING (ONE-SHOT VERSION FOR REPLIT)
+# ------------------------------------------------
+seen_posts = set()
 
+def poll_group_once():
+    print("📡 Polling Facebook group feed...")
+
+    url = f"https://graph.facebook.com/v17.0/{GROUP_ID}/feed"
+    params = {"access_token": PAGE_ACCESS_TOKEN}
+
+    r = requests.get(url, params=params)
+    data = r.json()
+    print("FB Response:", data)
+
+    if "data" not in data:
+        print("⚠ No feed data returned:", data)
+        return {"status": "error", "details": data}
+
+    for post in data["data"]:
+        post_id = post.get("id")
+        message = post.get("message", "")
+
+        if not post_id:
+            continue
+
+        if post_id in seen_posts:
+            continue
+
+        seen_posts.add(post_id)
+
+        print(f"📝 New post detected: {post_id} — {message}")
+
+        reply = get_reply_for_text(message)
+        send_comment(post_id, reply)
+
+    return {"status": "ok", "handled": len(seen_posts)}
+
+# ------------------------------------------------
+# PUBLIC ENDPOINT TRIGGERED BY UPTIMEROBOT
+# ------------------------------------------------
+@app.route("/poll", methods=["GET"])
+def poll_route():
+    result = poll_group_once()
+    return result, 200
+
+# ------------------------------------------------
+# RUN FLASK (NO BACKGROUND THREADS!)
+# ------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=8080)

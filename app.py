@@ -4,8 +4,12 @@ import os
 
 app = Flask(__name__)
 
+# ---------------------------------------------
+# CONFIG
+# ---------------------------------------------
 VERIFY_TOKEN = "triora_verify_2025"
-PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
+USER_ACCESS_TOKEN = os.getenv("USER_ACCESS_TOKEN")   # <-- correct token for replying
+
 
 # ---------------------------------------------
 # 🔥 KEYWORDS + UNIQUE RESPONSES (YOUR FULL LIST)
@@ -125,7 +129,7 @@ def reply_to_post(post_id, message):
     """Match keywords & send correct reply."""
     msg = message.lower()
 
-    reply_to_send = GENERIC_FALLBACK  # default
+    reply_to_send = GENERIC_FALLBACK  # default if nothing matches
 
     for keywords, reply in KEYWORD_REPLIES.items():
         if any(k in msg for k in keywords):
@@ -133,9 +137,10 @@ def reply_to_post(post_id, message):
             break
 
     url = f"https://graph.facebook.com/v17.0/{post_id}/comments"
+
     payload = {
         "message": reply_to_send,
-        "access_token": PAGE_ACCESS_TOKEN
+        "access_token": USER_ACCESS_TOKEN   # <--- FIXED HERE
     }
 
     response = requests.post(url, data=payload)

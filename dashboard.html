@@ -1,1 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Triora Dashboard</title>
+</head>
+<body>
+
+<header>
+    <img src="/static/logo.png">
+    <div>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/keywords">Keywords</a>
+        {% if session.role == "admin" %}
+        <a href="/admin/users">Users</a>
+        <a href="/admin/ai">AI Console</a>
+        {% endif %}
+        <a href="/logout">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+    <h1>📌 Pending Posts</h1>
+
+    {% if posts|length == 0 %}
+        <p>No posts detected yet.</p>
+    {% endif %}
+
+    {% for p in posts %}
+        <div class="post-box">
+            <p><strong>ID:</strong> {{ p.id }}</p>
+            <p>{{ p.text }}</p>
+            <a href="/post/{{ p.id }}">
+                <button>Review Post</button>
+            </a>
+        </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>
 

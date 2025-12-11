@@ -1,0 +1,25 @@
+app = "triora-bot"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "5000"
+
+[[services]]
+  internal_port = 5000
+  processes = ["app"]
+
+  [services.concurrency]
+    type = "connections"
+    soft_limit = 100
+    hard_limit = 150
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]

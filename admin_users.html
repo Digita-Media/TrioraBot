@@ -1,1 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Admin Users</title>
+</head>
+<body>
+
+<header>
+    <img src="/static/logo.png">
+    <a href="/dashboard">Dashboard</a>
+</header>
+
+<div class="container">
+    <h1>👥 User Management</h1>
+
+    <form method="POST">
+        <label>Email</label>
+        <input type="email" name="email">
+
+        <label>Password</label>
+        <input type="password" name="password">
+
+        <label>Role</label>
+        <select name="role">
+            <option value="staff">Staff</option>
+            <option value="admin">Admin</option>
+        </select>
+
+        <button type="submit">Add User</button>
+    </form>
+
+    <hr>
+
+    <h2>Existing Users</h2>
+
+    {% for email, u in users.items() %}
+        <p><strong>{{ email }}</strong> — {{ u.role }}</p>
+    {% endfor %}
+</div>
+
+</body>
+</html>
 

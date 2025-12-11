@@ -4,16 +4,15 @@ import os
 
 app = Flask(__name__)
 
-# ---------------------------------------------
+# ------------------------------------------------
 # CONFIG
-# ---------------------------------------------
+# ------------------------------------------------
 VERIFY_TOKEN = "triora_verify_2025"
-USER_ACCESS_TOKEN = os.getenv("USER_ACCESS_TOKEN")   # <-- correct token for replying
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")  # ← PAGE TOKEN (correct)
 
-
-# ---------------------------------------------
-# 🔥 KEYWORDS + UNIQUE RESPONSES (YOUR FULL LIST)
-# ---------------------------------------------
+# ------------------------------------------------
+# KEYWORDS + REPLIES
+# ------------------------------------------------
 KEYWORD_REPLIES = {
     ("mould", "black mould", "black spots"): """Thanks for sharing your post. Mould can appear for a variety of reasons, and understanding the underlying moisture source is important.
 
@@ -81,8 +80,9 @@ If you’d like some guidance, feel free to contact our team at Triora Damp & Mo
 
 
 # ------------------------------------------------
-# WEBHOOK VERIFICATION
+# ROUTES
 # ------------------------------------------------
+
 @app.route("/", methods=["GET"])
 def home():
     return "Triora Bot is running!", 200
@@ -90,6 +90,7 @@ def home():
 
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
+    """Facebook webhook verification."""
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
@@ -100,18 +101,16 @@ def verify_webhook():
     return "Verification token mismatch", 403
 
 
-# ------------------------------------------------
-# RECEIVE GROUP POSTS
-# ------------------------------------------------
 @app.route("/webhook", methods=["POST"])
 def receive_webhook():
+    """Handle incoming Group Feed events."""
     data = request.get_json()
     print("Webhook Received:", data)
 
     if "entry" in data:
         for entry in data["entry"]:
             for change in entry.get("changes", []):
-                if change.get("field") == "feed":
+                if change.get("field") == "feed":   # <-- Group feed posts
                     value = change.get("value", {})
                     if value.get("item") == "post":
                         post_id = value.get("post_id")
@@ -125,22 +124,22 @@ def receive_webhook():
 # ------------------------------------------------
 # REPLY LOGIC
 # ------------------------------------------------
+
 def reply_to_post(post_id, message):
-    """Match keywords & send correct reply."""
+    """Detect keywords and post the appropriate reply."""
     msg = message.lower()
 
-    reply_to_send = GENERIC_FALLBACK  # default if nothing matches
+    reply_text = GENERIC_FALLBACK
 
-    for keywords, reply in KEYWORD_REPLIES.items():
+    for keywords, response in KEYWORD_REPLIES.items():
         if any(k in msg for k in keywords):
-            reply_to_send = reply
+            reply_text = response
             break
 
     url = f"https://graph.facebook.com/v17.0/{post_id}/comments"
-
     payload = {
-        "message": reply_to_send,
-        "access_token": USER_ACCESS_TOKEN   # <--- FIXED HERE
+        "message": reply_text,
+        "access_token": PAGE_ACCESS_TOKEN,
     }
 
     response = requests.post(url, data=payload)
@@ -148,7 +147,8 @@ def reply_to_post(post_id, message):
 
 
 # ------------------------------------------------
-# RUN FLASK APP
+# RUN APP
 # ------------------------------------------------
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

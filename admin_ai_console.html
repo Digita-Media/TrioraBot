@@ -1,1 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>AI Console</title>
+</head>
+<body>
+
+<header>
+    <img src="/static/logo.png">
+    <a href="/dashboard">Dashboard</a>
+</header>
+
+<div class="container">
+    <h1>🤖 AI Admin Console</h1>
+
+    <form method="POST">
+        <label>Enter a command for the AI:</label>
+        <textarea name="prompt" rows="6"></textarea>
+
+        <button type="submit">Run</button>
+    </form>
+
+    <h2>Output</h2>
+    <div class="post-box">
+        {{ output }}
+    </div>
+</div>
+
+</body>
+</html>
 

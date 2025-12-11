@@ -1,1 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Review Post</title>
+</head>
+<body>
+
+<header>
+    <img src="/static/logo.png">
+    <a href="/dashboard">← Back</a>
+</header>
+
+<div class="container">
+    <h1>📝 Review Post</h1>
+
+    <p><strong>Post ID:</strong> {{ post.id }}</p>
+    <p>{{ post.text }}</p>
+
+    <hr>
+
+    <h2>Suggested Reply</h2>
+    <textarea rows="6">{{ suggestion }}</textarea>
+
+    <button>Send Reply</button>
+</div>
+
+</body>
+</html>
 
